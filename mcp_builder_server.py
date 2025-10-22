@@ -5,9 +5,14 @@ Takes text instructions and creates visual representations
 
 from mcp.server.fastmcp import FastMCP
 import anthropic
+import re
 import requests
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize the MCP server with a name
 mcp = FastMCP("Builder Agent")
@@ -15,6 +20,30 @@ mcp = FastMCP("Builder Agent")
 # Set up API clients (you'll need to add your API keys)
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY", "")
+
+
+def _sanitize_instructions(instructions: str) -> str:
+    """
+    Sanitizes user input to mitigate prompt injection.
+    It removes phrases and characters that are commonly used to manipulate LLMs.
+    """
+    # Remove control characters and backticks
+    instructions = re.sub(r'[\x00-\x1f`]', '', instructions)
+
+    # List of injection phrases (case-insensitive)
+    injection_phrases = [
+        "ignore the above", "ignore your previous instructions",
+        "disregard the above", "forget the above", "new instructions",
+        "new prompt", "system prompt", "your instructions are",
+        "act as", "roleplay as", "print your instructions",
+        "what are your instructions", "repeat the above",
+    ]
+
+    # Remove the phrases
+    for phrase in injection_phrases:
+        instructions = re.sub(phrase, '', instructions, flags=re.IGNORECASE)
+
+    return instructions.strip()
 
 
 @mcp.tool()
@@ -29,12 +58,18 @@ def generate_architecture(instructions: str) -> dict:
         Dictionary with mermaid code and explanation
     """
     
+    if not ANTHROPIC_KEY:
+        return {"error": "ANTHROPIC_API_KEY is not set. Please configure your API keys."}
+
+    # Sanitize user input to prevent prompt injection
+    sanitized_instructions = _sanitize_instructions(instructions)
+
     # Use Claude to convert instructions into structured architecture
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
     
     prompt = f"""Convert these instructions into a Mermaid flowchart diagram:
     
-Instructions: {instructions}
+Instructions: {sanitized_instructions}
 
 Create a clear, hierarchical Mermaid diagram showing the structure and flow.
 Return ONLY the mermaid code, no explanation."""
@@ -67,12 +102,18 @@ def generate_image(instructions: str, style: str = "realistic") -> dict:
         Dictionary with image URL and metadata
     """
     
+    if not ANTHROPIC_KEY or not OPENAI_KEY:
+        return {"error": "API keys are not set. Please configure ANTHROPIC_API_KEY and OPENAI_API_KEY."}
+
+    # Sanitize user input to prevent prompt injection
+    sanitized_instructions = _sanitize_instructions(instructions)
+
     # Use Claude to enhance the prompt for better image generation
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
     
     enhance_prompt = f"""Transform this into a detailed image generation prompt:
 
-Instructions: {instructions}
+Instructions: {sanitized_instructions}
 Style: {style}
 
 Create a concise, vivid prompt (max 200 chars) for DALL-E. Be specific about colors, perspective, lighting."""
