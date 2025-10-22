@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Builder - MCP Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🏗️ AI Builder</h1>
+            <p class="text-gray-600">Upload instructions, get architecture diagrams and images</p>
+        </div>
+
+        <!-- Input Section -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <label class="block text-lg font-semibold text-gray-700 mb-3">
+                Enter Your Instructions
+            </label>
+            <textarea 
+                id="instructions" 
+                rows="6" 
+                class="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition"
+                placeholder="Example: Build a modern 2-story house with garage, 3 bedrooms, kitchen, and living room with an open floor plan..."
+            ></textarea>
+            
+            <div class="flex gap-4 mt-4">
+                <button onclick="generateArchitecture()" 
+                    class="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-xl hover:bg-indigo-700 transition font-semibold">
+                    📐 Generate Architecture
+                </button>
+                <button onclick="generateImages()" 
+                    class="flex-1 bg-purple-600 text-white py-3 px-6 rounded-xl hover:bg-purple-700 transition font-semibold">
+                    🎨 Generate Images
+                </button>
+                <button onclick="fullBuild()" 
+                    class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-6 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition font-semibold">
+                    ⚡ Full Build
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="hidden bg-white rounded-2xl shadow-xl p-8 mb-6">
+            <div class="flex items-center justify-center space-x-3">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <span class="text-lg text-gray-700">Creating your vision...</span>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden">
+            <!-- Architecture Diagram -->
+            <div id="architectureSection" class="bg-white rounded-2xl shadow-xl p-8 mb-6 hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">📐 Architecture Diagram</h2>
+                <div class="bg-gray-50 rounded-xl p-6 overflow-x-auto">
+                    <div id="mermaidDiagram" class="mermaid"></div>
+                </div>
+            </div>
+
+            <!-- Images Gallery -->
+            <div id="imagesSection" class="bg-white rounded-2xl shadow-xl p-8 hidden">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">🎨 Generated Images</h2>
+                <div id="imageGallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Images will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid for diagram rendering
+        mermaid.initialize({ startOnLoad: false, theme: 'default' });
+
+        // MCP Server connection (adjust URL to your server)
+        const MCP_SERVER = 'http://localhost:8000';
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        function showResults() {
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        // Call the MCP tool via HTTP (assumes you have an HTTP wrapper)
+        async function callMCPTool(toolName, args) {
+            const response = await fetch(`${MCP_SERVER}/mcp/tools/${toolName}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(args)
+            });
+            return await response.json();
+        }
+
+        async function generateArchitecture() {
+            const instructions = document.getElementById('instructions').value;
+            if (!instructions) {
+                alert('Please enter instructions first!');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                // In real implementation, call your MCP server
+                const result = await callMCPTool('generate_architecture', { instructions });
+                
+                // Display the mermaid diagram
+                const diagramDiv = document.getElementById('mermaidDiagram');
+                diagramDiv.innerHTML = result.mermaid;
+                mermaid.run({ querySelector: '#mermaidDiagram' });
+                
+                document.getElementById('architectureSection').classList.remove('hidden');
+                showResults();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function generateImages() {
+            const instructions = document.getElementById('instructions').value;
+            if (!instructions) {
+                alert('Please enter instructions first!');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                // Generate multiple views
+                const styles = ['realistic', 'blueprint', 'sketch'];
+                const gallery = document.getElementById('imageGallery');
+                gallery.innerHTML = '';
+
+                for (const style of styles) {
+                    const result = await callMCPTool('generate_image', { instructions, style });
+                    
+                    const imgCard = `
+                        <div class="bg-gray-50 rounded-xl overflow-hidden shadow-lg">
+                            <img src="${result.image_url}" alt="${style}" class="w-full h-64 object-cover">
+                            <div class="p-4">
+                                <h3 class="font-semibold text-gray-800 capitalize">${style} View</h3>
+                            </div>
+                        </div>
+                    `;
+                    gallery.innerHTML += imgCard;
+                }
+                
+                document.getElementById('imagesSection').classList.remove('hidden');
+                showResults();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function fullBuild() {
+            const instructions = document.getElementById('instructions').value;
+            if (!instructions) {
+                alert('Please enter instructions first!');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                const result = await callMCPTool('full_build', { instructions });
+                
+                // Display architecture
+                const diagramDiv = document.getElementById('mermaidDiagram');
+                diagramDiv.innerHTML = result.architecture.mermaid;
+                mermaid.run({ querySelector: '#mermaidDiagram' });
+                document.getElementById('architectureSection').classList.remove('hidden');
+                
+                // Display images
+                const gallery = document.getElementById('imageGallery');
+                gallery.innerHTML = '';
+                
+                for (const [viewType, imageData] of Object.entries(result.images)) {
+                    if (imageData.image_url) {
+                        const imgCard = `
+                            <div class="bg-gray-50 rounded-xl overflow-hidden shadow-lg">
+                                <img src="${imageData.image_url}" alt="${viewType}" class="w-full h-64 object-cover">
+                                <div class="p-4">
+                                    <h3 class="font-semibold text-gray-800 capitalize">${viewType}</h3>
+                                </div>
+                            </div>
+                        `;
+                        gallery.innerHTML += imgCard;
+                    }
+                }
+                
+                document.getElementById('imagesSection').classList.remove('hidden');
+                showResults();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+    </script>
+</body>
+</html>

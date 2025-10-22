@@ -1,0 +1,14 @@
+# MCP Builder Server Dependencies
+
+# Core MCP framework - makes building MCP servers easy
+fastmcp>=0.1.0
+
+# Anthropic API - for Claude to process instructions
+anthropic>=0.40.0
+
+# HTTP requests - for calling image generation APIs
+requests>=2.31.0
+
+# Optional: If you want to run HTTP server wrapper
+fastapi>=0.104.0
+uvicorn>=0.24.0
